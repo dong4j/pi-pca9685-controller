@@ -1,0 +1,19 @@
+# 树莓派接入 PCA9685 舵机
+
+## 博客
+
+https://blog.dong4j.site/posts/a21c0fd1.html
+
+## 使用
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+
+pip install -r requirements.txt
+
+# 反激活
+deactivate
+```
+
+访问: http://localhost:5000

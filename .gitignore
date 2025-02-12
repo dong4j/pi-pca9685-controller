@@ -1,0 +1,5 @@
+# Project exclude paths
+.DS_Store
+
+__pycache__/
+venv/

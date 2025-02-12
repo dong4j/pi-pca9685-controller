@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>摄像头控制系统</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .video-container {
+            display: flex;
+            flex: 1;
+            gap: 10px;
+            margin-bottom: 10px;
+            min-height: 0; /* 防止溢出 */
+        }
+        .video-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #000;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .video-wrapper video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* 改回 contain 以显示完整视频 */
+        }
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center; /* 添加这行以垂直居中对齐 */
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        .control-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .control-grid {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            font-size: 20px;
+            margin: 2px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .control-btn:hover {
+            background-color: #0056b3;
+        }
+        .control-btn:active {
+            background-color: #004085;
+        }
+        .servo-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* 垂直居中 */
+            align-items: center; /* 水平居中 */
+            text-align: center;
+            margin: 0 20px;
+        }
+        #reset {
+            width: calc(100% - 20px);
+            height: 40px;
+            font-size: 16px;
+            margin-top: 10px;
+            border: none;
+            background-color: #28a745;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #reset:hover {
+            background-color: #218838;
+        }
+        #reset:active {
+            background-color: #1e7e34;
+        }
+        #joystick-container {
+            width: 150px;
+            height: 150px;
+            position: relative;
+        }
+        #joystick {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background-color: #f0f0f0;
+            position: relative;
+            overflow: visible; /* 改为 visible */
+        }
+        #joystick-knob {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: #007bff;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            transition: transform 0.1s ease-out; /* 添加平滑过渡效果 */
+        }
+        @media (max-height: 600px) {
+            .control-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+            }
+            #reset {
+                width: calc(120px + 10px);
+                height: 30px;
+                font-size: 14px;
+            }
+        }
+    </style>
+    <link href="https://vjs.zencdn.net/7.20.3/video-js.min.css" rel="stylesheet" />
+    <script src="https://vjs.zencdn.net/7.20.3/video.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-hls/5.15.0/videojs-contrib-hls.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flv.js/1.6.2/flv.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="video-container">
+            <div class="video-wrapper">
+                <video id="my-video" class="video-js" controls preload="auto" width="640" height="360">
+                    <p class="vjs-no-js">
+                        To view this video please enable JavaScript, and consider upgrading to a
+                        web browser that <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
+                    </p>
+                </video>
+            </div>
+            <div class="video-wrapper">
+                <video src="http://192.168.21.7:9090/pi5a/1.live.mp4" onerror="handleVideoError(this)" autoplay muted loop></video>
+            </div>
+        </div>
+        <div class="control-panel">
+            <div class="control-row">
+                <div class="control-section">
+                    <div class="control-grid">
+                        <div class="control-row">
+                            <button class="control-btn" style="visibility: hidden;">←</button>
+                            <button class="control-btn" onclick="singleControl('up')" onmousedown="startControl('up')" onmouseup="stopControl()" onmouseleave="stopControl()">↑</button>
+                            <button class="control-btn" style="visibility: hidden;">→</button>
+                        </div>
+                        <div class="control-row">
+                            <button class="control-btn" onclick="singleControl('left')" onmousedown="startControl('left')" onmouseup="stopControl()" onmouseleave="stopControl()">←</button>
+                            <button class="control-btn" onclick="singleControl('down')" onmousedown="startControl('down')" onmouseup="stopControl()" onmouseleave="stopControl()">↓</button>
+                            <button class="control-btn" onclick="singleControl('right')" onmousedown="startControl('right')" onmouseup="stopControl()" onmouseleave="stopControl()">→</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="servo-info">
+                    <p>水平舵机位置: <span id="servo0">375</span></p>
+                    <p>垂直舵机位置: <span id="servo1">445</span></p>
+                </div>
+                <div class="control-section">
+                    <div id="joystick-container">
+                        <div id="joystick">
+                            <div id="joystick-knob"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button id="reset">回正</button>
+        </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        let pressTimer;
+
+        function singleControl(direction) {
+            clearTimeout(pressTimer);
+            fetch('/control', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({direction: direction, action: 'single'})
+            })
+            .then(response => response.json())
+            .then(updateServoInfo)
+            .catch(handleError);
+        }
+
+        function startControl(direction) {
+            pressTimer = setTimeout(() => {
+                fetch('/control', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({direction: direction, action: 'start'})
+                })
+                .then(response => response.json())
+                .then(updateServoInfo)
+                .catch(handleError);
+            }, 200);  // 200ms 延迟，区分单击和长按
+        }
+
+        function stopControl() {
+            clearTimeout(pressTimer);
+            fetch('/control', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({direction: 'stop', action: 'stop'})
+            })
+            .then(response => response.json())
+            .then(updateServoInfo)
+            .catch(handleError);
+        }
+
+        function updateServoInfo(data) {
+            document.getElementById('servo0').textContent = data.servo0;
+            document.getElementById('servo1').textContent = data.servo1;
+        }
+
+        function handleError(error) {
+            console.error('发生错误:', error);
+            // 可以在这里添加用户提示
+        }
+
+        function handleVideoError(video) {
+            console.error('视频加载失败:', video.src);
+            video.style.display = 'none';
+            video.parentElement.textContent = '视频加载失败';
+        }
+
+        $('.control-btn').on('mousedown touchstart', function(e) {
+            e.preventDefault();
+            var direction = $(this).attr('id');
+            $.ajax({
+                url: '/control',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({direction: direction, action: 'start'}),
+                success: function(response) {
+                    console.log(response);
+                }
+            });
+        }).on('mouseup mouseleave touchend', function() {
+            $.ajax({
+                url: '/control',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({direction: '', action: 'stop'}),
+                success: function(response) {
+                    console.log(response);
+                }
+            });
+        });
+
+        $('#reset').on('click', function() {
+            $.ajax({
+                url: '/reset',
+                method: 'POST',
+                success: function(response) {
+                    console.log('舵机已重置', response);
+                    // 使用返回的数据更新舵机位置显示
+                    updateServoInfo(response);
+                },
+                error: function(xhr, status, error) {
+                    console.error('重置失败:', error);
+                    // 可以在这里添加错误提示
+                }
+            });
+        });
+
+        document.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+
+        // 添加摇杆控制代码
+        const joystick = document.getElementById('joystick');
+        const knob = document.getElementById('joystick-knob');
+        let isDragging = false;
+        let centerX, centerY, knobRadius, joystickRadius;
+
+        let lastServo0Position = 375; // 初始水平舵机置
+        let lastServo1Position = 445; // 初始垂直舵机位置
+
+        function initJoystick() {
+            const joystickRect = joystick.getBoundingClientRect();
+            centerX = joystickRect.width / 2;
+            centerY = joystickRect.height / 2;
+            joystickRadius = joystickRect.width / 2;
+            knobRadius = knob.offsetWidth / 2;
+        }
+
+        function handleJoystickMove(e) {
+            if (!isDragging) return;
+            
+            const joystickRect = joystick.getBoundingClientRect();
+            let mouseX = e.clientX - joystickRect.left;
+            let mouseY = e.clientY - joystickRect.top;
+
+            // 计算与中心的距离
+            let deltaX = mouseX - centerX;
+            let deltaY = mouseY - centerY;
+            let distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+            // 如果超出边界，进行限制
+            if (distance > joystickRadius - knobRadius) {
+                let angle = Math.atan2(deltaY, deltaX);
+                deltaX = Math.cos(angle) * (joystickRadius - knobRadius);
+                deltaY = Math.sin(angle) * (joystickRadius - knobRadius);
+            }
+
+            // 更新摇杆位置
+            knob.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+
+            // 计算角度和强度
+            let angle = Math.atan2(deltaY, deltaX) * 180 / Math.PI;
+            let strength = Math.min(distance / (joystickRadius - knobRadius), 1);
+
+            // 发送控制命令
+            sendJoystickControl(angle, strength);
+        }
+
+        function sendJoystickControl(angle, strength) {
+            let horizontalMove = Math.cos(angle * Math.PI / 180) * strength;
+            let verticalMove = -Math.sin(angle * Math.PI / 180) * strength;
+            
+            fetch('/joystick-control', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    horizontal: horizontalMove, 
+                    vertical: verticalMove,
+                    lastServo0: lastServo0Position,
+                    lastServo1: lastServo1Position
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateServoInfo(data);
+                lastServo0Position = data.servo0;
+                lastServo1Position = data.servo1;
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function resetJoystick() {
+            isDragging = false;
+            knob.style.transform = 'translate(-50%, -50%)';
+            sendJoystickControl(0, 0); // 发送中心位置信号
+        }
+
+        joystick.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            handleJoystickMove(e);
+        });
+
+        document.addEventListener('mousemove', handleJoystickMove);
+        document.addEventListener('mouseup', resetJoystick);
+
+        // 添加触摸事件支持
+        joystick.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            handleJoystickMove(e.touches[0]);
+        });
+        joystick.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // 防止页面滚动
+            handleJoystickMove(e.touches[0]);
+        });
+        joystick.addEventListener('touchend', resetJoystick);
+
+        window.addEventListener('resize', initJoystick);
+        initJoystick();
+
+        // 在 <script> 标签内添加以下代码
+
+        let player;
+
+        function initializePlayer(videoUrl, videoType) {
+            if (player) {
+                player.dispose();
+            }
+
+            let options = {
+                fluid: true,
+                controls: true,
+                preload: 'auto'
+            };
+
+            switch (videoType) {
+                case 'flv':
+                    options.techOrder = ['html5', 'flvjs'];
+                    options.sources = [{
+                        type: "video/x-flv",
+                        src: videoUrl
+                    }];
+                    break;
+                case 'm3u8':
+                    options.techOrder = ['html5', 'hlsjs'];
+                    options.sources = [{
+                        type: "application/x-mpegURL",
+                        src: videoUrl
+                    }];
+                    break;
+                case 'mp4':
+                    options.sources = [{
+                        type: "video/mp4",
+                        src: videoUrl
+                    }];
+                    break;
+                default:
+                    console.error('Unsupported video type');
+                    return;
+            }
+
+            player = videojs('my-video', options, function onPlayerReady() {
+                console.log('Player is ready');
+                this.play();
+            });
+        }
+
+        // 使用示例
+        // initializePlayer('http://example.com/video.mp4', 'mp4');
+
+        // 在页面加载完成后初始化播放器
+        window.addEventListener('load', function() {
+            // 从服务器获取视频 URL 和类型，或者直接在这里设置
+            let videoUrl = '{{ video_url }}';  // 假设这是从服务器传递的变量
+            let videoType = '{{ video_type }}';  // 可以是 'flv', 'm3u8', 或 'mp4'
+            initializePlayer(videoUrl, videoType);
+        });
+    </script>
+</body>
+</html>
